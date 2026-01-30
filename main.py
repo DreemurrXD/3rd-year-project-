@@ -42,6 +42,7 @@ def button_1(pin):
     global recording
     global time_past
     global length_of_recording
+    global cpt
     
     if ((time.ticks_diff(time.ticks_ms(), time_past[0])) > 300):
         time_past[0] = time.ticks_ms()
@@ -52,6 +53,7 @@ def button_1(pin):
         elif recording == True:
             recording = False
             print("stop")
+            cpt = 0
         
 buttons[0].irq(trigger=Pin.IRQ_FALLING, handler = button_1)   
 
@@ -85,7 +87,7 @@ bno2.enable_feature(BNO_REPORT_GYROSCOPE,20 )
 bno2.enable_feature(BNO_REPORT_GAME_ROTATION_VECTOR, 10)
 bno2.set_quaternion_euler_vector(BNO_REPORT_GAME_ROTATION_VECTOR)
 #print("BNO08x sensors enabling : Done\n")
-
+global cpt
 cpt = 0
 average_delay = -1
 total = 0
@@ -144,7 +146,7 @@ while True:
         sensor_2 = R2
         led.on()
         
-        if cpt == 0:
+        if cpt == 5:
             #print("taring")
             offset1 = sensor_1
             offset2 = sensor_2
@@ -160,27 +162,28 @@ while True:
         
         if (sensor_1>300) :
             sensor_1 = sensor_1 -360
-            print("more that")
         elif (sensor_1<-60):
             sensor_1 = sensor_1 + 360
-            print("less than")
+            
         if (sensor_2>300) :
             sensor_2 = sensor_2 -360
-            print("more that 2")
-        elif (P2<-60):
+            
+        elif (sensor_2<-60):
             sensor_2 = sensor_2 + 360
-            print("less than 2")
+            
         
-        
-        print("sensor1")
-        print(sensor_1)#filtered
-        print("sensor2")
-        print(sensor_2)
+        if cpt > 4:
+            print("sensor1")
+            print(sensor_1)#filtered
+            print("sensor2")
+            print(sensor_2)
+            
+            print(cpt)
+            print("length_of_recording")
+            print(round(length_of_recording/1000,1))
+            
         
         cpt += 1
-        #print(cpt)
-        print("length_of_recording")
-        print(round(length_of_recording/1000,1))
         """
         if cpt == 1000:
             print("end")
