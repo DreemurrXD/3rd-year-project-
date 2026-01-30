@@ -1,0 +1,254 @@
+clf
+m1 = 1.7875;
+m2 = 1.0285;
+m3 = 0.3575;
+L1 = 0.29412;
+L2 = 0.366795;
+g = 9.81;
+
+m3_new = 2.3575;
+
+Ts = 0.01;
+%global data_in;
+
+
+%serial input
+
+import mlreportgen.utils.*
+%new_character = normalizeString(str)
+%closing all serial ports so you don't have to reset the connection each
+%time
+search = serialportfind
+delete(search)
+
+s = serialport("COM6", 115220);
+P = [];
+P2 = [];
+array_check = [];
+length_of_recording = 0;
+n = 1;
+disp("start")
+while n==1
+    response = readline(s);
+    %array_check = [array_check, response]
+    if response == ["stop"+ sprintf('\r')]
+        n = 2;
+    end
+    if response == ["sensor1" + sprintf('\r')]
+        %disp("P1 detected")
+        response = readline(s);
+        new_character = normalizeString(response);
+        if isnumeric(str2double(new_character)) == 1
+            P = [P, str2double(new_character)];
+            %disp("it's a number");
+        end
+    end
+
+    if response == ["sensor2" + sprintf('\r')]
+        %disp("P2 detected")
+        response = readline(s);
+        new_character = normalizeString(response);
+        if isnumeric(str2double(new_character)) == 1
+            P2 = [P2, str2double(new_character)];
+            %disp("it's a number 2");
+        end
+    end    
+    if response == ["length_of_recording" + sprintf('\r')]
+        %disp("length_of_recording")
+        response = readline(s);
+        new_character = normalizeString(response);
+        if isnumeric(str2double(new_character)) == 1
+            length_of_recording = str2double(new_character)
+            %disp("it's the length");
+        end
+    end 
+
+end
+length_of_recording =round(length_of_recording, 1);
+disp("done")
+disp(length_of_recording)
+%disp(P)
+%disp(P2)
+%disp("vector")
+%disp(P')
+hold on
+plot(P','b')
+plot(P2','g')
+hold off
+
+data_in = P;
+data_in2 = P2;
+%length of recording already assigned
+
+
+
+
+
+
+
+
+
+
+%data_in = 0:0.04:40;
+%time_in = 0:0.025:25;
+
+%data_in = timeseries(data_in2,time_in);
+simout_model_based = 'Simulation_1_picking_up_weights';
+mdlWks = get_param('Simulation_1_picking_up_weights','ModelWorkspace');    
+clear(mdlWks)
+assignin(mdlWks, 'data_in',data_in)
+assignin(mdlWks, 'data_in2', data_in2)
+assignin(mdlWks, 'trial_length', length_of_recording)
+
+assignin(mdlWks, 'm1',m1)
+assignin(mdlWks, 'm2',m2)
+assignin(mdlWks, 'm3',m3)
+assignin(mdlWks, 'L1',L1)
+assignin(mdlWks, 'L2',L2)
+assignin(mdlWks, 'g',g)
+assignin(mdlWks, 'm3_new',m3_new)
+value = getVariable(mdlWks, 'data_in')
+%open_system(simout_model_based)
+%load_system(simout_model_based)
+%set_param(simout_model_based,SimulationCommand="start")                                                                            
+%load_system(simout_model_based)
+out = sim(simout_model_based);
+
+disp("done")
+%1 is input line and 2 is the output
+out.logsout
+
+%check = get_param(simout_model_based, 'SimulationStatus')
+
+%excess is the time of an unfinished trial right at the end
+excess = mod(2000,(length_of_recording+3));
+%total length is the total length of a trial+reset
+total_length =length_of_recording+3;
+
+%figure containing input and output of arm 1
+figure
+hold on
+%clock
+t = out.logsout{1}.Values.Data;
+%signal 1
+input_1 = squeeze(out.logsout{5}.Values.Data);
+plot(t, input_1,"g");
+xlim([1950 2000])
+%smoothed_1
+ref = squeeze(out.logsout{13}.Values.Data);
+plot(t, ref,"b");
+xlim([1950 2000])
+%output 1
+y1 = squeeze(out.logsout{7}.Values.Data);
+plot(t, y1, "r");
+xlim([1950 2000])
+title('Plot of upper arm')
+hold off;
+
+%figure containing input and output of arm 2
+figure
+hold on
+%clock 
+t = out.logsout{1}.Values.Data;
+%signal 1
+input_2 = squeeze(out.logsout{6}.Values.Data);
+plot(t, input_2,"g");
+xlim([1950 2000])
+%smoothed 2
+ref2 = squeeze(out.logsout{14}.Values.Data);
+plot(t, ref2,"b");
+xlim([1950 2000])
+%output 2
+y2 = squeeze(out.logsout{8}.Values.Data);
+plot(t, y2, "r");
+xlim([1950 2000])
+title('Plot of lower arm')
+hold off;
+
+%ILC effort graph
+figure
+hold on;
+t = squeeze(out.logsout{2}.Values.Time);
+ilc_effort = squeeze(out.logsout{2}.Values.Data);
+xlim([1950 2000])
+plot(t, ilc_effort, "b");
+hold off;
+
+
+figure
+hold on
+title('Animation of final controlled movement')
+mkr1 = scatter(NaN,NaN,[],"red","filled");
+mkr2 = scatter(NaN,NaN,[],"blue","filled");
+hold off
+xlim([-1 1])
+ylim([-1 1])
+zlim([-1 1])
+ax = gca;
+ax.DataAspectRatio = [1 1 1];
+n=1;
+
+
+%length(y1)
+%length(y2)
+%round((2000-(excess+total_length))*length(y1))
+%round((2000-(excess))*length(y1))
+theta1 = y1(round(((2000-(excess+total_length))/2000)*length(y1) ):round(((2000-(excess+3))/2000)*length(y1))) ;
+theta2 = y2(round(((2000-(excess+total_length))/2000)*length(y2) ):round(((2000-(excess+3))/2000)*length(y2))) ;
+
+
+
+x_1 =  L1 .* sin((theta1./360)*2*pi);
+y_1 =  -L1 .* cos((theta1./360)*2*pi);
+x_2 =  L2 .* sin((theta2./360)*2*pi) + L1 .* sin((theta1./360)*2*pi);
+y_2 =  -L2 .* cos((theta2./360)*2*pi) - L1 .* cos((theta1./360)*2*pi);
+% Move the marker along the line
+
+line1 = animatedline;
+line2 = animatedline;
+
+length_of_animation = x_1;
+
+video = VideoWriter("2dof","MPEG-4");
+video.FrameRate = 30;
+open(video);
+
+interval = floor((length(length_of_animation))/(30*length_of_recording));
+
+record = 1;
+
+while n==1
+    for i = 1:length(length_of_animation)
+        mkr1.XData = x_1(i);
+        mkr1.YData = y_1(i);
+        
+        line1_x = linspace(0,x_1(i),30);
+        line1_y = linspace(0,y_1(i),30);
+        addpoints(line1, line1_x, line1_y);
+        drawnow limitrate 
+
+
+        mkr2.XData = x_2(i);
+        mkr2.YData = y_2(i);
+
+        line2_x = linspace(x_1(i),x_2(i),30);
+        line2_y = linspace(y_1(i),y_2(i),30);
+        addpoints(line2, line2_x, line2_y);
+        drawnow limitrate
+        if record == 1
+            if mod(i,interval)==0
+                if i ~= length(length_of_animation)
+                    frame = getframe(gcf);
+                    writeVideo(video,frame);
+                end
+            end
+        end
+
+        pause(0.000001)
+        clearpoints(line1)
+        clearpoints(line2)
+        drawnow limitrate 
+    end
+    close(video)
+    record = 0;
+end
