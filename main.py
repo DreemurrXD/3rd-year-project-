@@ -28,14 +28,16 @@ led = Pin('LED', Pin.OUT)
 
 #ground is input for button, called buttons in case more buttons are required
 global buttons
-buttons = [Pin(18, Pin.IN, Pin.PULL_UP)]
+buttons = [Pin(18, Pin.IN, Pin.PULL_UP), Pin (21, Pin.IN, Pin.PULL_UP )]
 
 global time_past
-time_past = [0]
+time_past = [0, 0]
 global recording
 recording = False
 global length_of_recording
 length_of_recording = 0
+global m3_state
+m3_state = 0
 
 
 def button_1(pin):
@@ -56,6 +58,22 @@ def button_1(pin):
             cpt = 0
         
 buttons[0].irq(trigger=Pin.IRQ_FALLING, handler = button_1)   
+
+def button_2(pin):
+    global recording
+    global time_past
+    global m3_state
+    
+    if ((time.ticks_diff(time.ticks_ms(), time_past[1])) > 300):
+        time_past[1] = time.ticks_ms()            
+        if recording == True:
+            if m3_state == 0:
+                m3_state = 1
+            elif m3_state == 1:
+                m3_state = 0
+        
+buttons[1].irq(trigger=Pin.IRQ_FALLING, handler = button_2)   
+
 
 
 def countdown_function(timer):
@@ -96,6 +114,7 @@ table = []
 time_table = []
 offset1 = 0
 offset2 = 0
+offset_yz = 0
 #led.on()
 #time.sleep(5)
 #all print statements get sent to matlab via serial
@@ -137,6 +156,7 @@ while True:
     if recording == False:
         length_of_recording = 0
         timer_origin = time.ticks_ms()
+        m3_state = 0
     
     if recording == True:
         R, T, P = bno.euler
@@ -144,18 +164,21 @@ while True:
         #print("Euler Angle\tX: {:+.3f}\tY: {:+.3f}\tZ: {:+.3f}".format(R, T, P))
         sensor_1 = R
         sensor_2 = R2
+        sensor_yz = -T
         led.on()
         
         if cpt == 5:
             #print("taring")
             offset1 = sensor_1
             offset2 = sensor_2
+            offsetyz= sensor_yz
             #print(offset1, offset2, "offsets")
             led.off()     
             led.on()
 
         sensor_1 = sensor_1-offset1
         sensor_2 = sensor_2-offset2
+        sensor_yz = sensor_yz - offset_yz
          
         
         ###-180 to 180 degrees
@@ -171,16 +194,27 @@ while True:
         elif (sensor_2<-60):
             sensor_2 = sensor_2 + 360
             
+        if (sensor_yz >225):
+            sensor_yz = sensor_yz - 180
+            
+        elif (sensor_yz <-45):
+            sensor_yz = sensor_yz + 180
+        
         
         if cpt > 4:
             print("sensor1")
             print(sensor_1)#filtered
             print("sensor2")
             print(sensor_2)
+            print("sensorYZ")
+            print(sensor_yz)
             
             print(cpt)
             print("length_of_recording")
             print(round(length_of_recording/1000,1))
+            
+            print("m3_input")
+            print(m3_state)
             
         
         cpt += 1
